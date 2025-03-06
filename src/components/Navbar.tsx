@@ -38,6 +38,7 @@ const Navbar = () => {
           <nav className="hidden md:flex items-center space-x-1">
             {[
               { text: "Home", path: "/" },
+              { text: "Timeline", path: "/timeline" },
               { text: "Features", path: "/features" },
               { text: "Pricing", path: "/pricing" },
               { text: "About", path: "/about" }
@@ -62,9 +63,9 @@ const Navbar = () => {
                 Join Waitlist
               </Button>
             </Link>
-            <Link to="#demo">
+            <Link to="/timeline">
               <Button className="relative overflow-hidden group">
-                <span className="relative z-10">Try Demo</span>
+                <span className="relative z-10">Generate Timeline</span>
                 <span className="absolute inset-0 bg-primary/80 translate-y-[101%] group-hover:translate-y-0 transition-transform duration-300"></span>
               </Button>
             </Link>

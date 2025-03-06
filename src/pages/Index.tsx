@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -98,8 +97,8 @@ const Index = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 animate-scale-in">
-              <Button className="relative overflow-hidden group" size="lg">
-                <span className="relative z-10">Get Started for Free</span>
+              <Button className="relative overflow-hidden group" size="lg" onClick={() => window.location.href = '/timeline'}>
+                <span className="relative z-10">Generate Timeline</span>
                 <span className="absolute inset-0 bg-primary/80 translate-y-[101%] group-hover:translate-y-0 transition-transform duration-300"></span>
               </Button>
               
@@ -224,9 +223,15 @@ const Index = () => {
               <h2 className="text-2xl md:text-3xl font-medium mb-4">
                 Ready to understand your codebase?
               </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-6">
                 Join the Chronocode waitlist to be among the first to experience a new way of understanding code evolution.
               </p>
+              <div className="flex justify-center">
+                <Button className="relative overflow-hidden group" onClick={() => window.location.href = '/timeline'}>
+                  <span className="relative z-10">Try Timeline Generator Now</span>
+                  <span className="absolute inset-0 bg-primary/80 translate-y-[101%] group-hover:translate-y-0 transition-transform duration-300"></span>
+                </Button>
+              </div>
             </div>
             
             <div className="flex flex-col md:flex-row gap-4 max-w-xl mx-auto">
