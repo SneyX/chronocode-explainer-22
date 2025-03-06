@@ -1,4 +1,3 @@
-
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -74,8 +73,7 @@ const Pricing = () => {
                 features={[
                   "5 repositories per month",
                   "5 million tokens per month",
-                  "Basic analytics",
-                  "7-day data retention"
+                  "Basic analytics"
                 ]}
                 ctaText="Get Started"
               />
@@ -88,7 +86,6 @@ const Pricing = () => {
                   "Up to 20 repositories per month",
                   "Up to 20 million tokens per month",
                   "Advanced analytics",
-                  "30-day data retention",
                   "Priority support"
                 ]}
                 popular={true}
@@ -103,7 +100,6 @@ const Pricing = () => {
                   "Unlimited repositories",
                   "Unlimited tokens",
                   "Custom integrations",
-                  "Unlimited data retention",
                   "Dedicated support",
                   "SLA guarantees"
                 ]}
