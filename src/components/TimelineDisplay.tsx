@@ -3,6 +3,7 @@ import { useState } from "react";
 import { GitCommit, Clock, User, Search, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 
 interface Commit {
   id: string;
@@ -10,7 +11,10 @@ interface Commit {
   description: string;
   date: string;
   author: string;
+  authorImage: string;
   analysis: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface TimelineProps {
@@ -76,6 +80,68 @@ const TimelineDisplay = ({ timeline }: TimelineProps) => {
         </div>
       </div>
 
+      {/* Gantt Chart Style Timeline */}
+      <div className="bg-background/50 p-6 rounded-lg border overflow-x-auto">
+        <div className="min-w-[800px]">
+          {/* Header */}
+          <div className="flex mb-6">
+            <div className="w-1/4 font-medium text-sm">Task</div>
+            <div className="w-3/4 flex">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="flex-1 text-center text-xs text-muted-foreground">
+                  Period {i + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Timeline Items */}
+          <div className="space-y-6">
+            {filteredCommits.map((commit, index) => {
+              // Calculate relative position and width for timeline bar
+              // For demo purposes, I'm using random values, but you would calculate these
+              // based on actual dates in a real implementation
+              const startPosition = Math.floor(Math.random() * 5) + 1; // Random start between 1-5
+              const duration = Math.floor(Math.random() * 4) + 1; // Random duration between 1-4
+
+              return (
+                <div key={commit.id} className="flex items-center animate-fade-in" 
+                     style={{ animationDelay: `${index * 0.1}s` }}>
+                  <div className="w-1/4 pr-4">
+                    <div className="font-medium text-sm truncate">{commit.title}</div>
+                    <div className="text-xs text-muted-foreground">{commit.author}</div>
+                  </div>
+                  
+                  <div className="w-3/4 flex items-center h-10 relative">
+                    {/* Timeline Bar */}
+                    <div 
+                      className="absolute h-8 bg-primary/20 rounded-md flex items-center px-2"
+                      style={{ 
+                        left: `${(startPosition - 1) * 10}%`,
+                        width: `${duration * 10}%`
+                      }}
+                    >
+                      <Avatar className="h-6 w-6 border-2 border-background">
+                        <img src={commit.authorImage} alt={commit.author} />
+                      </Avatar>
+                    </div>
+                    
+                    {/* Grid Lines */}
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="flex-1 border-l border-border/40 h-full"
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* List View of Commits */}
       <div className="relative space-y-6 pl-6 before:absolute before:inset-y-0 before:left-2 before:w-0.5 before:bg-border">
         {filteredCommits.map((commit, index) => (
           <div 
@@ -96,7 +162,12 @@ const TimelineDisplay = ({ timeline }: TimelineProps) => {
               expandedCommit === commit.id ? "shadow-md" : ""
             )}>
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
-                <h3 className="font-medium text-lg">{commit.title}</h3>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-8 w-8 border-2 border-background">
+                    <img src={commit.authorImage} alt={commit.author} />
+                  </Avatar>
+                  <h3 className="font-medium text-lg">{commit.title}</h3>
+                </div>
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Clock className="h-3.5 w-3.5" />
                   <span>{formatDate(commit.date)}</span>

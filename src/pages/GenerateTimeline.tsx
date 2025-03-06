@@ -20,7 +20,10 @@ const GenerateTimeline = () => {
       description: string;
       date: string;
       author: string;
+      authorImage: string;
       analysis: string;
+      startDate?: string;
+      endDate?: string;
     }>;
   }>(null);
   const navigate = useNavigate();
@@ -52,6 +55,14 @@ const GenerateTimeline = () => {
       const urlParts = repoUrl.split('/');
       const repoName = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
       
+      // Avatar placeholders
+      const avatars = [
+        "https://github.com/shadcn.png",
+        "https://avatars.githubusercontent.com/u/124599?v=4",
+        "https://avatars.githubusercontent.com/u/6764957?v=4",
+        "https://avatars.githubusercontent.com/u/76580?v=4"
+      ];
+      
       // Simulate timeline data
       const mockTimeline = {
         repositoryName: repoName,
@@ -62,6 +73,9 @@ const GenerateTimeline = () => {
             description: "Created project structure with core configuration files and dependencies.",
             date: "2023-11-05",
             author: "Sarah Chen",
+            authorImage: avatars[0],
+            startDate: "2023-11-01",
+            endDate: "2023-11-05",
             analysis: "Developer focused on establishing a solid foundation with modern best practices, suggesting attention to scalability from the project's inception."
           },
           {
@@ -70,6 +84,9 @@ const GenerateTimeline = () => {
             description: "Implemented JWT-based authentication with secure password handling and user sessions.",
             date: "2023-11-12",
             author: "Michael Rodriguez",
+            authorImage: avatars[1],
+            startDate: "2023-11-06",
+            endDate: "2023-11-12",
             analysis: "Security was a primary concern, with careful implementation of token refresh logic and protection against common auth vulnerabilities."
           },
           {
@@ -78,6 +95,9 @@ const GenerateTimeline = () => {
             description: "Defined database schema and models for core application entities.",
             date: "2023-11-18",
             author: "Aisha Johnson",
+            authorImage: avatars[2],
+            startDate: "2023-11-13",
+            endDate: "2023-11-18",
             analysis: "The database design indicates thoughtful consideration of data relationships and query performance, with proper indexing strategies."
           },
           {
@@ -86,6 +106,9 @@ const GenerateTimeline = () => {
             description: "Created RESTful API endpoints for resource access and manipulation.",
             date: "2023-11-25",
             author: "Sarah Chen",
+            authorImage: avatars[0],
+            startDate: "2023-11-19",
+            endDate: "2023-11-25",
             analysis: "Developer prioritized consistent API design with clear input validation and error handling patterns across all endpoints."
           },
           {
@@ -94,6 +117,9 @@ const GenerateTimeline = () => {
             description: "Built reusable UI component library with consistent styling and interactions.",
             date: "2023-12-02",
             author: "Michael Rodriguez",
+            authorImage: avatars[1],
+            startDate: "2023-11-26",
+            endDate: "2023-12-02",
             analysis: "The component architecture shows attention to reusability and composition, with thoughtful props interfaces and internal state management."
           },
           {
@@ -102,6 +128,9 @@ const GenerateTimeline = () => {
             description: "Optimized data fetching and rendering for improved application performance.",
             date: "2023-12-08",
             author: "Aisha Johnson",
+            authorImage: avatars[2],
+            startDate: "2023-12-03",
+            endDate: "2023-12-08",
             analysis: "Performance bottlenecks were systematically identified and addressed, with careful attention to both server response times and client-side rendering."
           },
           {
@@ -110,6 +139,9 @@ const GenerateTimeline = () => {
             description: "Implemented comprehensive testing suite with unit and integration tests.",
             date: "2023-12-15",
             author: "Sarah Chen",
+            authorImage: avatars[0],
+            startDate: "2023-12-09",
+            endDate: "2023-12-15",
             analysis: "Test coverage focuses on critical paths and edge cases, suggesting a mature approach to quality assurance and regression prevention."
           }
         ]
