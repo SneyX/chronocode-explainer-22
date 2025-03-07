@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -6,26 +5,16 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { GitFork, ArrowRight, Loader2 } from "lucide-react";
-import TimelineDisplay from "@/components/TimelineDisplay";
+import { GitFork, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import ChronoTimeline, { Timeline } from "@/components/ChronoTimeline";
+import { apiService } from "@/services/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const GenerateTimeline = () => {
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [timeline, setTimeline] = useState<null | {
-    repositoryName: string;
-    commits: Array<{
-      id: string;
-      title: string;
-      description: string;
-      date: string;
-      author: string;
-      authorImage: string;
-      analysis: string;
-      startDate?: string;
-      endDate?: string;
-    }>;
-  }>(null);
+  const [timeline, setTimeline] = useState<Timeline | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,114 +33,26 @@ const GenerateTimeline = () => {
     }
     
     setIsLoading(true);
+    setError(null);
     
-    // In a real app, we would fetch the actual data from an API
-    // This is a simulation for demo purposes
     try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check API health first
+      try {
+        await apiService.healthCheck();
+      } catch (healthError) {
+        throw new Error("API server is not available. Please make sure the FastAPI server is running.");
+      }
       
-      // Get repo name from URL for the demo
-      const urlParts = repoUrl.split('/');
-      const repoName = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
+      // Generate timeline from API
+      const timelineData = await apiService.generateTimeline(repoUrl);
       
-      // Avatar placeholders
-      const avatars = [
-        "https://github.com/shadcn.png",
-        "https://avatars.githubusercontent.com/u/124599?v=4",
-        "https://avatars.githubusercontent.com/u/6764957?v=4",
-        "https://avatars.githubusercontent.com/u/76580?v=4"
-      ];
-      
-      // Simulate timeline data
-      const mockTimeline = {
-        repositoryName: repoName,
-        commits: [
-          {
-            id: "a1b2c3d",
-            title: "Initial Setup",
-            description: "Created project structure with core configuration files and dependencies.",
-            date: "2023-11-05",
-            author: "Sarah Chen",
-            authorImage: avatars[0],
-            startDate: "2023-11-01",
-            endDate: "2023-11-05",
-            analysis: "Developer focused on establishing a solid foundation with modern best practices, suggesting attention to scalability from the project's inception."
-          },
-          {
-            id: "e4f5g6h",
-            title: "Authentication System",
-            description: "Implemented JWT-based authentication with secure password handling and user sessions.",
-            date: "2023-11-12",
-            author: "Michael Rodriguez",
-            authorImage: avatars[1],
-            startDate: "2023-11-06",
-            endDate: "2023-11-12",
-            analysis: "Security was a primary concern, with careful implementation of token refresh logic and protection against common auth vulnerabilities."
-          },
-          {
-            id: "i7j8k9l",
-            title: "Database Models",
-            description: "Defined database schema and models for core application entities.",
-            date: "2023-11-18",
-            author: "Aisha Johnson",
-            authorImage: avatars[2],
-            startDate: "2023-11-13",
-            endDate: "2023-11-18",
-            analysis: "The database design indicates thoughtful consideration of data relationships and query performance, with proper indexing strategies."
-          },
-          {
-            id: "m1n2o3p",
-            title: "API Endpoints",
-            description: "Created RESTful API endpoints for resource access and manipulation.",
-            date: "2023-11-25",
-            author: "Sarah Chen",
-            authorImage: avatars[0],
-            startDate: "2023-11-19",
-            endDate: "2023-11-25",
-            analysis: "Developer prioritized consistent API design with clear input validation and error handling patterns across all endpoints."
-          },
-          {
-            id: "q4r5s6t",
-            title: "UI Components",
-            description: "Built reusable UI component library with consistent styling and interactions.",
-            date: "2023-12-02",
-            author: "Michael Rodriguez",
-            authorImage: avatars[1],
-            startDate: "2023-11-26",
-            endDate: "2023-12-02",
-            analysis: "The component architecture shows attention to reusability and composition, with thoughtful props interfaces and internal state management."
-          },
-          {
-            id: "u7v8w9x",
-            title: "Performance Optimization",
-            description: "Optimized data fetching and rendering for improved application performance.",
-            date: "2023-12-08",
-            author: "Aisha Johnson",
-            authorImage: avatars[2],
-            startDate: "2023-12-03",
-            endDate: "2023-12-08",
-            analysis: "Performance bottlenecks were systematically identified and addressed, with careful attention to both server response times and client-side rendering."
-          },
-          {
-            id: "y1z2a3b",
-            title: "Testing Framework",
-            description: "Implemented comprehensive testing suite with unit and integration tests.",
-            date: "2023-12-15",
-            author: "Sarah Chen",
-            authorImage: avatars[0],
-            startDate: "2023-12-09",
-            endDate: "2023-12-15",
-            analysis: "Test coverage focuses on critical paths and edge cases, suggesting a mature approach to quality assurance and regression prevention."
-          }
-        ]
-      };
-      
-      setTimeline(mockTimeline);
-      toast.success(`Timeline generated for ${repoName}`);
+      setTimeline(timelineData);
+      toast.success(`Timeline generated for ${timelineData.repositoryName}`);
     } catch (error) {
-      toast.error("Failed to generate timeline. Please try again.");
-      console.error(error);
+      console.error("Error generating timeline:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate timeline. Please try again.";
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -214,10 +115,36 @@ const GenerateTimeline = () => {
           </div>
         </section>
         
-        {timeline && (
+        {error && (
+          <section className="py-4 px-6">
+            <div className="container mx-auto max-w-3xl">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          </section>
+        )}
+        
+        {isLoading && (
           <section className="py-8 px-6 pb-16">
             <div className="container mx-auto">
-              <TimelineDisplay timeline={timeline} />
+              <ChronoTimeline 
+                timeline={{
+                  repositoryName: "Loading...",
+                  commits: []
+                }} 
+                isLoading={true} 
+              />
+            </div>
+          </section>
+        )}
+        
+        {!isLoading && timeline && (
+          <section className="py-8 px-6 pb-16">
+            <div className="container mx-auto">
+              <ChronoTimeline timeline={timeline} />
             </div>
           </section>
         )}
