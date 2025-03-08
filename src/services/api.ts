@@ -1,4 +1,4 @@
-import { Timeline, Commit, Hito } from '@/components/ChronoTimeline';
+import { CommitRecord, CommitAnalysisRecord } from '@/lib/supabase';
 
 // API base URL - change this to your FastAPI server URL
 const API_BASE_URL = 'http://localhost:8000';
@@ -9,12 +9,17 @@ interface RepositoryRequest {
   access_token?: string;
 }
 
+export interface ApiTimelineResponse {
+  repositoryName: string;
+  commits: any[];
+}
+
 // API service
 export const apiService = {
   /**
    * Get all commits from a repository
    */
-  async getCommits(repoUrl: string, accessToken?: string): Promise<Commit[]> {
+  async getCommits(repoUrl: string, accessToken?: string): Promise<CommitRecord[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/commits`, {
         method: 'POST',
@@ -32,7 +37,20 @@ export const apiService = {
         throw new Error(errorData.detail || 'Failed to fetch commits');
       }
 
-      return await response.json();
+      // The API might return data in a different format, so we convert it
+      const data = await response.json();
+      return data.map((item: any) => ({
+        id: item.id || item.sha,
+        repo_name: item.repository_name || item.repo_name,
+        sha: item.sha,
+        author: item.author,
+        date: item.date,
+        message: item.message || item.title,
+        url: item.url,
+        author_email: item.author_email,
+        description: item.description,
+        author_url: item.author_url
+      }));
     } catch (error) {
       console.error('Error fetching commits:', error);
       throw error;
@@ -42,9 +60,9 @@ export const apiService = {
   /**
    * Generate a timeline for a repository
    */
-  async generateTimeline(repoUrl: string, accessToken?: string): Promise<Timeline> {
+  async generateTimeline(repoUrl: string, accessToken?: string): Promise<ApiTimelineResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/timeline`, {
+      const response = await fetch(`${API_BASE_URL}/api/timeline-events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,21 +110,4 @@ export const apiService = {
     }
   },
 
-  /**
-   * Health check for the API
-   */
-  async healthCheck(): Promise<{ status: string }> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/health`);
-      
-      if (!response.ok) {
-        throw new Error('API health check failed');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API health check failed:', error);
-      throw error;
-    }
-  }
 }; 
