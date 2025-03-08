@@ -110,7 +110,7 @@ const CommitBar: React.FC<CommitBarProps> = ({ commit, analysis, startDate, endD
   const constrainedPosition = Math.max(0, Math.min(position, 100));
   
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={0}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div 
@@ -130,7 +130,7 @@ const CommitBar: React.FC<CommitBarProps> = ({ commit, analysis, startDate, endD
             </Avatar>
           </div>
         </TooltipTrigger>
-        <TooltipContent className="max-w-sm">
+        <TooltipContent side="top" className="max-w-sm" sideOffset={5}>
           <div className="space-y-2">
             <div className="font-medium">{analysis?.title || commit.message}</div>
             <div className="text-xs flex items-center gap-1">
