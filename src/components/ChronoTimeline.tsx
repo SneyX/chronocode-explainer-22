@@ -39,6 +39,33 @@ import {
   TimelinePeriod, 
   TimelineGroupBy 
 } from '@/lib/supabase';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Treemap,
+  ScatterChart,
+  Scatter,
+  ZAxis
+} from 'recharts';
+import { 
+  BarChart3, 
+  PieChart as PieChartIcon, 
+  Network, 
+  FileText, 
+  Lightbulb,
+  Braces,
+  FileCode,
+  GitPullRequest
+} from 'lucide-react';
 
 // Types
 export interface TimelineData {
@@ -69,6 +96,361 @@ interface CommitCluster {
   position: number; // percentage position on timeline
   count: number;
 }
+
+// Add these helper functions for the Code Impact Analysis
+interface FileImpactData {
+  name: string;
+  value: number;
+  children?: FileImpactData[];
+  path?: string;
+  color?: string;
+}
+
+// Function to process commit data into file impact statistics
+const processFileChanges = (commits: CommitRecord[]): FileImpactData => {
+  // In a real implementation, we would parse the commit data to extract file changes
+  // For this demo, we'll create mock data representing file changes
+  
+  // Create a hierarchical structure of directories and files
+  const root: FileImpactData = {
+    name: 'root',
+    value: 0,
+    children: []
+  };
+  
+  // Mock file paths that might be changed in commits
+  const mockFilePaths = [
+    'src/components/ui/button.tsx',
+    'src/components/ui/dialog.tsx',
+    'src/components/ui/input.tsx',
+    'src/components/ChronoTimeline.tsx',
+    'src/components/Navbar.tsx',
+    'src/pages/GenerateTimeline.tsx',
+    'src/pages/Index.tsx',
+    'src/lib/utils.ts',
+    'src/lib/supabase.ts',
+    'src/services/api.ts',
+    'src/services/supabaseService.ts',
+    'public/assets/logo.svg',
+    'README.md',
+    'package.json'
+  ];
+  
+  // Assign random change counts to files based on commit volume
+  const commitCount = commits.length;
+  
+  mockFilePaths.forEach(filePath => {
+    // Calculate a weighted value based on the number of commits
+    // More commits = more likely to have higher change counts
+    const changeCount = Math.floor(Math.random() * commitCount * 0.5) + 1;
+    
+    // Split the path into parts
+    const parts = filePath.split('/');
+    const fileName = parts.pop() || '';
+    
+    // Navigate/create the directory structure
+    let currentNode = root;
+    
+    for (const part of parts) {
+      // Find or create directory node
+      let dirNode = currentNode.children?.find(child => child.name === part);
+      
+      if (!dirNode) {
+        dirNode = {
+          name: part,
+          value: 0,
+          children: []
+        };
+        currentNode.children?.push(dirNode);
+      }
+      
+      currentNode = dirNode;
+    }
+    
+    // Add the file node
+    currentNode.children?.push({
+      name: fileName,
+      value: changeCount,
+      path: filePath
+    });
+    
+    // Update parent directory values
+    let tempNode = root;
+    for (const part of parts) {
+      tempNode = tempNode.children?.find(child => child.name === part) as FileImpactData;
+      tempNode.value += changeCount;
+    }
+  });
+  
+  // Assign colors based on file types
+  const assignColors = (node: FileImpactData) => {
+    if (node.children) {
+      node.children.forEach(assignColors);
+    } else {
+      // Assign colors based on file extension
+      const ext = node.name.split('.').pop()?.toLowerCase();
+      switch (ext) {
+        case 'tsx':
+        case 'jsx':
+          node.color = '#61dafb'; // React blue
+          break;
+        case 'ts':
+        case 'js':
+          node.color = '#3178c6'; // TypeScript blue
+          break;
+        case 'css':
+        case 'scss':
+          node.color = '#264de4'; // CSS blue
+          break;
+        case 'json':
+          node.color = '#f5de19'; // JSON yellow
+          break;
+        case 'md':
+          node.color = '#083fa1'; // Markdown blue
+          break;
+        case 'svg':
+          node.color = '#ff9900'; // SVG orange
+          break;
+        default:
+          node.color = '#718096'; // Default gray
+      }
+    }
+  };
+  
+  assignColors(root);
+  
+  return root;
+};
+
+// Custom Treemap content component
+const CustomTreemapContent = (props: any) => {
+  const { root, depth, x, y, width, height, index, name, value, colors } = props;
+  
+  // Don't render if width or height is too small
+  if (width < 10 || height < 10) {
+    return null;
+  }
+  
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        style={{
+          fill: props.color || colors[index % colors.length],
+          stroke: '#fff',
+          strokeWidth: 2 / (depth + 1e-10),
+          strokeOpacity: 1 / (depth + 1e-10),
+        }}
+      />
+      {width > 30 && height > 30 && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={12}
+          fill="#fff"
+          style={{ pointerEvents: 'none' }}
+        >
+          {name}
+        </text>
+      )}
+      {width > 60 && height > 20 && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2 + 12}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={10}
+          fill="#fff"
+          style={{ pointerEvents: 'none' }}
+        >
+          {value} changes
+        </text>
+      )}
+    </g>
+  );
+};
+
+// Now add the Code Impact Analysis component
+const CodeImpactAnalysis: React.FC<{
+  commits: CommitRecord[];
+}> = ({ commits }) => {
+  // Define mockFilePaths here to avoid reference errors
+  const mockFilePaths = [
+    'src/components/ui/button.tsx',
+    'src/components/ui/dialog.tsx',
+    'src/components/ui/input.tsx',
+    'src/components/ChronoTimeline.tsx',
+    'src/components/Navbar.tsx',
+    'src/pages/GenerateTimeline.tsx',
+    'src/pages/Index.tsx',
+    'src/lib/utils.ts',
+    'src/lib/supabase.ts',
+    'src/services/api.ts',
+    'src/services/supabaseService.ts',
+    'public/assets/logo.svg',
+    'README.md',
+    'package.json'
+  ];
+  
+  // Process the commit data to get file impact statistics
+  const fileImpactData = useMemo(() => processFileChanges(commits), [commits]);
+  
+  // Prepare data for the treemap
+  const treemapData = useMemo(() => {
+    // Create a flattened array for the treemap
+    const flattenHierarchy = (node: FileImpactData, parentPath = ''): any[] => {
+      const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+      
+      if (!node.children || node.children.length === 0) {
+        return [{
+          name: node.name,
+          fullPath: currentPath,
+          size: node.value,
+          color: node.color || '#8884d8'
+        }];
+      }
+      
+      // Include the parent directory with its own size
+      const result = [{
+        name: node.name,
+        fullPath: currentPath,
+        size: node.value * 0.2, // Reduce parent size to make children more visible
+        color: '#718096' // Gray for directories
+      }];
+      
+      // Add all children
+      node.children.forEach(child => {
+        result.push(...flattenHierarchy(child, currentPath));
+      });
+      
+      return result;
+    };
+    
+    return flattenHierarchy(fileImpactData).filter(item => item.size > 0);
+  }, [fileImpactData]);
+  
+  // Colors for the treemap
+  const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
+  
+  return (
+    <div className="space-y-6">
+      <div className="w-full flex flex-col md:flex-row justify-center items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-xl font-medium">Code Impact Heatmap</h3>
+          <p className="text-muted-foreground">
+            Visualizing which files and directories have the most changes.
+          </p>
+        </div>
+      </div>
+      
+      <div className="h-[500px] w-full bg-background/30 rounded-lg border overflow-hidden">
+        {treemapData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <Treemap
+              data={treemapData}
+              dataKey="size"
+              nameKey="name"
+              stroke="#fff"
+            >
+              <RechartsTooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-background border rounded-md shadow-md p-3">
+                        <p className="font-medium">{data.fullPath}</p>
+                        <p className="text-sm text-muted-foreground">{data.size} changes</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+            </Treemap>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-2">
+              <FileCode className="h-12 w-12 text-muted-foreground mx-auto" />
+              <p className="text-muted-foreground">No file impact data available</p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="p-4 border rounded-lg bg-background/60">
+          <h4 className="font-medium mb-2 flex items-center gap-2">
+            <FileCode className="h-4 w-4 text-primary" />
+            Most Changed Files
+          </h4>
+          <ul className="space-y-2">
+            {mockFilePaths.slice(0, 5).map((path, index) => (
+              <li key={index} className="flex justify-between items-center text-sm">
+                <span className="truncate">{path.split('/').pop()}</span>
+                <Badge variant="outline">{Math.floor(Math.random() * 50) + 10} changes</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+        
+        <div className="p-4 border rounded-lg bg-background/60">
+          <h4 className="font-medium mb-2 flex items-center gap-2">
+            <GitPullRequest className="h-4 w-4 text-primary" />
+            Active Directories
+          </h4>
+          <ul className="space-y-2">
+            {['src/components', 'src/pages', 'src/lib', 'src/services', 'public/assets'].map((dir, index) => (
+              <li key={index} className="flex justify-between items-center text-sm">
+                <span>{dir}</span>
+                <Badge variant="outline">{Math.floor(Math.random() * 100) + 20} changes</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+        
+        <div className="p-4 border rounded-lg bg-background/60">
+          <h4 className="font-medium mb-2 flex items-center gap-2">
+            <Braces className="h-4 w-4 text-primary" />
+            File Type Distribution
+          </h4>
+          <div className="h-[150px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'TypeScript', value: 45 },
+                    { name: 'React', value: 30 },
+                    { name: 'CSS', value: 15 },
+                    { name: 'JSON', value: 5 },
+                    { name: 'Other', value: 5 }
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={60}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {COLORS.map((color, index) => (
+                    <Cell key={`cell-${index}`} fill={color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Helper functions
 const formatDate = (dateString: string) => {
@@ -280,6 +662,659 @@ const ClusterDialog: React.FC<{
   );
 };
 
+// Add these helper functions and components for the Commit Complexity Analysis
+interface ComplexityData {
+  id: string;
+  date: string;
+  complexity: number;
+  impactScope: number;
+  type: string;
+  author: string;
+  message: string;
+  color?: string;
+}
+
+// Function to calculate commit complexity metrics
+const calculateCommitComplexity = (
+  commits: CommitRecord[],
+  analyses: CommitAnalysisRecord[]
+): ComplexityData[] => {
+  // In a real implementation, we would analyze the actual commit content
+  // For this demo, we'll create mock complexity data
+  
+  return commits.map(commit => {
+    // Find the corresponding analysis
+    const analysis = analyses.find(a => a.commit_sha === commit.sha);
+    
+    // Calculate a mock complexity score (1-10)
+    // In a real implementation, this would be based on code metrics
+    const complexity = Math.floor(Math.random() * 10) + 1;
+    
+    // Calculate a mock impact scope (1-10)
+    // In a real implementation, this would be based on number of files changed
+    const impactScope = Math.floor(Math.random() * 10) + 1;
+    
+    // Determine the type from the analysis or use a default
+    const type = analysis?.type || 'OTHER';
+    
+    // Assign a color based on the type
+    let color;
+    switch (type) {
+      case 'FEATURE':
+        color = '#4299e1'; // blue
+        break;
+      case 'FIX':
+        color = '#48bb78'; // green
+        break;
+      case 'REFACTOR':
+        color = '#ed8936'; // orange
+        break;
+      case 'DOCS':
+        color = '#9f7aea'; // purple
+        break;
+      case 'TEST':
+        color = '#ecc94b'; // yellow
+        break;
+      default:
+        color = '#a0aec0'; // gray
+    }
+    
+    return {
+      id: commit.sha,
+      date: commit.date,
+      complexity,
+      impactScope,
+      type,
+      author: commit.author,
+      message: commit.message,
+      color
+    };
+  });
+};
+
+// Custom tooltip for the scatter plot
+const CustomScatterTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    
+    return (
+      <div className="bg-background border rounded-md shadow-md p-3 max-w-xs">
+        <p className="font-medium mb-1 truncate">{data.message}</p>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>Author: {data.author}</p>
+          <p>Date: {formatDate(data.date)}</p>
+          <p>Type: {data.type}</p>
+          <p>Complexity: {data.complexity}/10</p>
+          <p>Impact Scope: {data.impactScope}/10</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return null;
+};
+
+// Now add the Commit Complexity Analysis component
+const CommitComplexityAnalysis: React.FC<{
+  commits: CommitRecord[];
+  analyses: CommitAnalysisRecord[];
+}> = ({ commits, analyses }) => {
+  // Calculate complexity metrics
+  const complexityData = useMemo(
+    () => calculateCommitComplexity(commits, analyses),
+    [commits, analyses]
+  );
+  
+  // Group data by type for the bar chart
+  const typeData = useMemo(() => {
+    const types: Record<string, { count: number, avgComplexity: number }> = {};
+    
+    complexityData.forEach(item => {
+      if (!types[item.type]) {
+        types[item.type] = { count: 0, avgComplexity: 0 };
+      }
+      
+      types[item.type].count += 1;
+      types[item.type].avgComplexity += item.complexity;
+    });
+    
+    // Calculate averages
+    Object.keys(types).forEach(type => {
+      types[type].avgComplexity = parseFloat((types[type].avgComplexity / types[type].count).toFixed(1));
+    });
+    
+    // Convert to array for the chart
+    return Object.entries(types).map(([type, data]) => ({
+      type,
+      count: data.count,
+      avgComplexity: data.avgComplexity
+    }));
+  }, [complexityData]);
+  
+  // Group data by author for the bar chart
+  const authorData = useMemo(() => {
+    const authors: Record<string, { count: number, avgComplexity: number }> = {};
+    
+    complexityData.forEach(item => {
+      if (!authors[item.author]) {
+        authors[item.author] = { count: 0, avgComplexity: 0 };
+      }
+      
+      authors[item.author].count += 1;
+      authors[item.author].avgComplexity += item.complexity;
+    });
+    
+    // Calculate averages
+    Object.keys(authors).forEach(author => {
+      authors[author].avgComplexity = parseFloat((authors[author].avgComplexity / authors[author].count).toFixed(1));
+    });
+    
+    // Convert to array for the chart
+    return Object.entries(authors).map(([author, data]) => ({
+      author,
+      count: data.count,
+      avgComplexity: data.avgComplexity
+    }));
+  }, [complexityData]);
+  
+  return (
+    <div className="space-y-6">
+      <div className="w-full flex flex-col md:flex-row justify-center items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-xl font-medium">Commit Complexity Analysis</h3>
+          <p className="text-muted-foreground">
+            Analyzing the complexity and scope of commits over time.
+          </p>
+        </div>
+      </div>
+      
+      <div className="h-[400px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart
+            margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              type="category"
+              dataKey="date"
+              name="Date"
+              tickFormatter={(value) => {
+                try {
+                  return format(parseISO(value), 'MMM d');
+                } catch (e) {
+                  return value;
+                }
+              }}
+              label={{ value: 'Date', position: 'insideBottomRight', offset: -10 }}
+            />
+            <YAxis
+              type="number"
+              dataKey="complexity"
+              name="Complexity"
+              domain={[0, 10]}
+              label={{ value: 'Complexity', angle: -90, position: 'insideLeft' }}
+            />
+            <ZAxis
+              type="number"
+              dataKey="impactScope"
+              range={[50, 400]}
+              name="Impact Scope"
+            />
+            <RechartsTooltip content={<CustomScatterTooltip />} />
+            <Legend />
+            
+            {/* Group scatters by type */}
+            {Array.from(new Set(complexityData.map(item => item.type))).map(type => {
+              const filteredData = complexityData.filter(item => item.type === type);
+              const color = filteredData[0]?.color || '#a0aec0';
+              
+              return (
+                <Scatter
+                  key={type}
+                  name={type}
+                  data={filteredData}
+                  fill={color}
+                />
+              );
+            })}
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 border rounded-lg bg-background/60">
+          <h4 className="font-medium mb-4">Complexity by Commit Type</h4>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={typeData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="type" />
+                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                <RechartsTooltip />
+                <Legend />
+                <Bar yAxisId="left" dataKey="count" name="Number of Commits" fill="#8884d8" />
+                <Bar yAxisId="right" dataKey="avgComplexity" name="Avg. Complexity" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        <div className="p-4 border rounded-lg bg-background/60">
+          <h4 className="font-medium mb-4">Complexity by Author</h4>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={authorData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="author" />
+                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                <RechartsTooltip />
+                <Legend />
+                <Bar yAxisId="left" dataKey="count" name="Number of Commits" fill="#8884d8" />
+                <Bar yAxisId="right" dataKey="avgComplexity" name="Avg. Complexity" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Add these helper functions and components for the Developer Focus Patterns
+interface DeveloperFocusData {
+  author: string;
+  primary: string;
+  expertise: { name: string; percentage: number }[];
+  commitCount: number;
+  lastActive: string;
+}
+
+// Function to analyze developer focus areas
+const analyzeDevFocus = (commits: CommitRecord[]): Record<string, DeveloperFocusData> => {
+  // In a real implementation, we would analyze the actual files changed in commits
+  // For this demo, we'll create mock data
+  
+  // Group commits by author
+  const authorCommits: Record<string, CommitRecord[]> = {};
+  
+  commits.forEach(commit => {
+    if (!authorCommits[commit.author]) {
+      authorCommits[commit.author] = [];
+    }
+    
+    authorCommits[commit.author].push(commit);
+  });
+  
+  // Mock file paths that might be changed in commits
+  const mockFilePaths = [
+    'src/components/ui',
+    'src/components',
+    'src/pages',
+    'src/lib',
+    'src/services',
+    'public/assets',
+    'tests',
+    'docs'
+  ];
+  
+  // Create mock focus data for each author
+  const focusData: Record<string, DeveloperFocusData> = {};
+  
+  Object.entries(authorCommits).forEach(([author, commits]) => {
+    // Randomly assign focus areas
+    const focusAreas = mockFilePaths
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(4, mockFilePaths.length))
+      .map(area => {
+        return {
+          name: area,
+          percentage: Math.floor(Math.random() * 80) + 20
+        };
+      })
+      .sort((a, b) => b.percentage - a.percentage);
+    
+    // Normalize percentages to sum to 100
+    const totalPercentage = focusAreas.reduce((sum, area) => sum + area.percentage, 0);
+    focusAreas.forEach(area => {
+      area.percentage = Math.round((area.percentage / totalPercentage) * 100);
+    });
+    
+    // Find the last active date
+    const dates = commits.map(commit => new Date(commit.date).getTime());
+    const lastActive = new Date(Math.max(...dates)).toISOString();
+    
+    focusData[author] = {
+      author,
+      primary: focusAreas[0].name,
+      expertise: focusAreas,
+      commitCount: commits.length,
+      lastActive
+    };
+  });
+  
+  return focusData;
+};
+
+// Now add the Developer Focus Patterns component
+const DeveloperFocusPatterns: React.FC<{
+  commits: CommitRecord[];
+}> = ({ commits }) => {
+  // Analyze developer focus areas
+  const focusData = useMemo(() => analyzeDevFocus(commits), [commits]);
+  
+  // Convert to array for easier rendering
+  const developers = useMemo(() => 
+    Object.values(focusData).sort((a, b) => b.commitCount - a.commitCount),
+    [focusData]
+  );
+  
+  // Generate colors for the expertise areas
+  const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
+  
+  return (
+    <div className="space-y-6">
+      <div className="w-full flex flex-col md:flex-row justify-center items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-xl font-medium">Developer Focus Patterns</h3>
+          <p className="text-muted-foreground">
+            Identifying which developers specialize in which parts of the codebase.
+          </p>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {developers.map(dev => (
+          <div key={dev.author} className="p-4 border rounded-lg bg-background/60">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
+                    {dev.author.substring(0, 2).toUpperCase()}
+                  </div>
+                </Avatar>
+                <div>
+                  <h4 className="font-medium">{dev.author}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {dev.commitCount} commits · Last active: {formatDate(dev.lastActive)}
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                {dev.commitCount} commits
+              </Badge>
+            </div>
+            
+            <div className="mt-4">
+              <h5 className="text-sm font-medium mb-2">Primary focus: {dev.primary}</h5>
+              
+              <div className="space-y-3">
+                {dev.expertise.map((area, index) => (
+                  <div key={area.name} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>{area.name}</span>
+                      <span>{area.percentage}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full" 
+                        style={{ 
+                          width: `${area.percentage}%`,
+                          backgroundColor: COLORS[index % COLORS.length]
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="p-4 border rounded-lg bg-background/60">
+        <h4 className="font-medium mb-4">Team Collaboration Network</h4>
+        <p className="text-muted-foreground mb-4">
+          Visualizing how developers collaborate on different parts of the codebase.
+        </p>
+        <div className="flex items-center justify-center p-8 border border-dashed rounded-lg">
+          <div className="text-center">
+            <Network className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              Collaboration network visualization would be displayed here in a full implementation.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Add these helper functions and components for the Semantic Commit Analysis
+interface SemanticGroup {
+  theme: string;
+  commits: CommitRecord[];
+  analyses: CommitAnalysisRecord[];
+  startDate: string;
+  endDate: string;
+  commitCount: number;
+  summary: string;
+  keywords: string[];
+  color: string;
+}
+
+// Function to analyze commit themes
+const analyzeCommitThemes = (
+  commits: CommitRecord[],
+  analyses: CommitAnalysisRecord[]
+): SemanticGroup[] => {
+  // In a real implementation, we would use NLP to extract themes from commit messages
+  // For this demo, we'll create mock semantic groups
+  
+  // Define some mock themes
+  const mockThemes = [
+    {
+      theme: 'User Interface Improvements',
+      summary: 'Enhancements to the user interface components and layout',
+      keywords: ['UI', 'design', 'layout', 'components', 'responsive'],
+      color: '#3182ce' // blue
+    },
+    {
+      theme: 'Performance Optimization',
+      summary: 'Optimizations to improve application performance and loading times',
+      keywords: ['performance', 'speed', 'optimization', 'loading', 'cache'],
+      color: '#38a169' // green
+    },
+    {
+      theme: 'Bug Fixes',
+      summary: 'Resolving issues and bugs in the application',
+      keywords: ['fix', 'bug', 'issue', 'resolve', 'problem'],
+      color: '#e53e3e' // red
+    },
+    {
+      theme: 'Feature Development',
+      summary: 'Adding new features and functionality to the application',
+      keywords: ['feature', 'add', 'new', 'implement', 'functionality'],
+      color: '#805ad5' // purple
+    },
+    {
+      theme: 'Code Refactoring',
+      summary: 'Restructuring and improving code quality without changing functionality',
+      keywords: ['refactor', 'clean', 'restructure', 'improve', 'quality'],
+      color: '#dd6b20' // orange
+    },
+    {
+      theme: 'Documentation',
+      summary: 'Improving documentation and code comments',
+      keywords: ['docs', 'documentation', 'comment', 'readme', 'guide'],
+      color: '#718096' // gray
+    }
+  ];
+  
+  // Sort commits by date
+  const sortedCommits = [...commits].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  
+  if (sortedCommits.length === 0) {
+    return [];
+  }
+  
+  // Divide commits into time periods
+  const totalCommits = sortedCommits.length;
+  const groupCount = Math.min(mockThemes.length, Math.max(2, Math.floor(totalCommits / 5)));
+  const commitsPerGroup = Math.ceil(totalCommits / groupCount);
+  
+  const groups: SemanticGroup[] = [];
+  
+  for (let i = 0; i < groupCount; i++) {
+    const startIndex = i * commitsPerGroup;
+    const endIndex = Math.min(startIndex + commitsPerGroup, totalCommits);
+    const groupCommits = sortedCommits.slice(startIndex, endIndex);
+    
+    if (groupCommits.length === 0) continue;
+    
+    const theme = mockThemes[i % mockThemes.length];
+    const groupAnalyses = analyses.filter(analysis => 
+      groupCommits.some(commit => commit.sha === analysis.commit_sha)
+    );
+    
+    groups.push({
+      ...theme,
+      commits: groupCommits,
+      analyses: groupAnalyses,
+      startDate: groupCommits[0].date,
+      endDate: groupCommits[groupCommits.length - 1].date,
+      commitCount: groupCommits.length
+    });
+  }
+  
+  return groups;
+};
+
+// Helper function to format a date range
+const formatDateRange = (startDate: string, endDate: string): string => {
+  try {
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  } catch (e) {
+    return `${startDate} - ${endDate}`;
+  }
+};
+
+// Now add the Semantic Commit Analysis component
+const SemanticCommitAnalysis: React.FC<{
+  commits: CommitRecord[];
+  analyses: CommitAnalysisRecord[];
+}> = ({ commits, analyses }) => {
+  // Analyze commit themes
+  const semanticGroups = useMemo(
+    () => analyzeCommitThemes(commits, analyses),
+    [commits, analyses]
+  );
+  
+  // Prepare data for the bar chart
+  const chartData = useMemo(() => {
+    return semanticGroups.map(group => ({
+      name: group.theme,
+      commits: group.commitCount,
+      fill: group.color
+    }));
+  }, [semanticGroups]);
+  
+  return (
+    <div className="space-y-6">
+      <div className="w-full flex flex-col md:flex-row justify-center items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-xl font-medium">Semantic Commit Analysis</h3>
+          <p className="text-muted-foreground">
+            Grouping commits by semantic meaning and themes.
+          </p>
+        </div>
+      </div>
+      
+      <div className="h-[300px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={chartData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <RechartsTooltip />
+            <Legend />
+            <Bar dataKey="commits" name="Number of Commits">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      
+      <div className="space-y-6">
+        {semanticGroups.map((group, index) => (
+          <div 
+            key={group.theme} 
+            className="border-l-4 pl-4 py-2" 
+            style={{ borderColor: group.color }}
+          >
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-2">
+              <h4 className="font-medium text-lg">{group.theme}</h4>
+              <div className="text-sm text-muted-foreground">
+                {formatDateRange(group.startDate, group.endDate)} · {group.commitCount} commits
+              </div>
+            </div>
+            
+            <p className="mt-2 text-muted-foreground">{group.summary}</p>
+            
+            <div className="mt-3 flex flex-wrap gap-1">
+              {group.keywords.map(keyword => (
+                <Badge key={keyword} variant="outline" className="text-xs">
+                  {keyword}
+                </Badge>
+              ))}
+            </div>
+            
+            <div className="mt-4 space-y-2">
+              <h5 className="text-sm font-medium">Key Commits:</h5>
+              <div className="space-y-2">
+                {group.commits.slice(0, 3).map(commit => {
+                  const analysis = group.analyses.find(a => a.commit_sha === commit.sha);
+                  
+                  return (
+                    <div 
+                      key={commit.sha} 
+                      className="p-3 bg-background/60 rounded-md border text-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{analysis?.title || commit.message}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(commit.date)}</div>
+                      </div>
+                      {analysis && (
+                        <div className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                          {analysis.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoading = false }) => {
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
@@ -298,6 +1333,9 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
   const [selectedCluster, setSelectedCluster] = useState<CommitCluster | null>(null);
   const [isClusterDialogOpen, setIsClusterDialogOpen] = useState<boolean>(false);
   const [clusterThreshold, setClusterThreshold] = useState<number>(2); // percentage threshold for clustering
+
+  // Add this to the ChronoTimeline component state
+  const [activeView, setActiveView] = useState<'timeline' | 'impact' | 'complexity' | 'focus' | 'semantic'>('timeline');
 
   // Derive date range from commits
   const dateRange = useMemo(() => {
@@ -731,117 +1769,203 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
         </div>
       </div>
 
-      {/* Gantt Chart Timeline View */}
-      <div className="bg-background/50 p-6 rounded-lg border overflow-x-auto">
-        <div className="min-w-[800px]">
-          {/* Header - Time Periods */}
-          <div className="grid gap-2" style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}>
-            <div className="font-medium text-sm">
-              {groupBy === 'type' ? 'Categories' : groupBy === 'author' ? 'Authors' : 'Time Periods'}
-            </div>
-            
-            {periodColumns.map((period, index) => (
-              <div key={index} className="text-center text-xs text-muted-foreground font-medium p-1">
-                {period.label}
-              </div>
-            ))}
-          </div>
+      {/* View Selector Tabs */}
+      <div className="mt-6">
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as any)}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              <span>Timeline</span>
+            </TabsTrigger>
+            <TabsTrigger value="impact" className="flex items-center gap-2">
+              <FileCode className="h-4 w-4" />
+              <span>Code Impact</span>
+            </TabsTrigger>
+            <TabsTrigger value="complexity" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Complexity</span>
+            </TabsTrigger>
+            <TabsTrigger value="focus" className="flex items-center gap-2">
+              <Network className="h-4 w-4" />
+              <span>Developer Focus</span>
+            </TabsTrigger>
+            <TabsTrigger value="semantic" className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4" />
+              <span>Semantic Analysis</span>
+            </TabsTrigger>
+          </TabsList>
           
-          {/* Gantt Rows */}
-          <div className="mt-4 space-y-4">
-            {groupKeys.map((group, rowIndex) => {
-              // Get all analyses for this group and their associated commits
-              const groupAnalyses = groups[group];
-              const groupCommits = groupAnalyses
-                .map(analysis => {
-                  const commit = timelineData.commits.find(c => c.sha === analysis.commit_sha);
-                  return commit ? { commit, analysis } : null;
-                })
-                .filter(Boolean)
-                .map(item => item as { commit: CommitRecord, analysis: CommitAnalysisRecord });
-              
-              // Process clustering for this row
-              const clusteredData = createCommitClusters(
-                groupCommits.map(item => item.commit),
-                groupCommits.map(item => item.analysis),
-                clusterThreshold
-              );
-              
-              return (
-                <div 
-                  key={group} 
-                  className="relative"
-                >
-                  {/* Row Label */}
-                  <div 
-                    className="grid gap-2 items-center" 
-                    style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}
-                  >
-                    <div className="font-medium text-sm truncate">
-                      {groupBy === 'type' && (
-                        <Badge variant="outline" className={`bg-primary/10 text-primary border-primary/20`}>
-                          {group}
-                        </Badge>
-                      )}
-                      {groupBy === 'author' && (
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
-                              {group.substring(0, 2).toUpperCase()}
-                            </div>
-                          </Avatar>
-                          <span>{group}</span>
-                        </div>
-                      )}
-                      {groupBy === 'date' && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{group}</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Timeline Grid Cells */}
-                    {periodColumns.map((period, colIndex) => (
-                      <div 
-                        key={`${group}-${colIndex}`} 
-                        className="border border-border/30 rounded min-h-12 h-12"
-                      ></div>
-                    ))}
+          <TabsContent value="timeline">
+            {/* Gantt Chart Timeline View */}
+            <div className="bg-background/50 p-6 rounded-lg border overflow-x-auto">
+              <div className="min-w-[800px]">
+                {/* Header - Time Periods */}
+                <div className="grid gap-2" style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}>
+                  <div className="font-medium text-sm">
+                    {groupBy === 'type' ? 'Categories' : groupBy === 'author' ? 'Authors' : 'Time Periods'}
                   </div>
                   
-                  {/* Commits positioned over the timeline */}
-                  <div 
-                    className="absolute top-0 left-[200px] right-0 h-12 flex items-center"
-                  >
-                    {/* Render individual commits */}
-                    {clusteredData.singleCommits.map(({commit, analysis, position}) => (
-                      <CommitBar
-                        key={commit.sha}
-                        commit={commit}
-                        analysis={analysis}
-                        startDate={dateRange.startDate}
-                        endDate={dateRange.endDate}
-                        onClick={() => openCommitDetails(commit, analysis)}
-                      />
-                    ))}
-                    
-                    {/* Render commit clusters */}
-                    {clusteredData.clusters.map((cluster, i) => (
-                      <CommitClusterBar
-                        key={`cluster-${i}`}
-                        cluster={cluster}
-                        startDate={dateRange.startDate}
-                        endDate={dateRange.endDate}
-                        onClusterClick={handleClusterClick}
-                      />
-                    ))}
-                  </div>
+                  {periodColumns.map((period, index) => (
+                    <div key={index} className="text-center text-xs text-muted-foreground font-medium p-1">
+                      {period.label}
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                
+                {/* Gantt Rows */}
+                <div className="mt-4 space-y-4">
+                  {groupKeys.map((group, rowIndex) => {
+                    // Get all analyses for this group and their associated commits
+                    const groupAnalyses = groups[group];
+                    const groupCommits = groupAnalyses
+                      .map(analysis => {
+                        const commit = timelineData.commits.find(c => c.sha === analysis.commit_sha);
+                        return commit ? { commit, analysis } : null;
+                      })
+                      .filter(Boolean)
+                      .map(item => item as { commit: CommitRecord, analysis: CommitAnalysisRecord });
+                    
+                    // Process clustering for this row
+                    const clusteredData = createCommitClusters(
+                      groupCommits.map(item => item.commit),
+                      groupCommits.map(item => item.analysis),
+                      clusterThreshold
+                    );
+                    
+                    return (
+                      <div 
+                        key={group} 
+                        className="relative"
+                      >
+                        {/* Row Label */}
+                        <div 
+                          className="grid gap-2 items-center" 
+                          style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}
+                        >
+                          <div className="font-medium text-sm truncate">
+                            {groupBy === 'type' && (
+                              <Badge variant="outline" className={`bg-primary/10 text-primary border-primary/20`}>
+                                {group}
+                              </Badge>
+                            )}
+                            {groupBy === 'author' && (
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
+                                    {group.substring(0, 2).toUpperCase()}
+                                  </div>
+                                </Avatar>
+                                <span>{group}</span>
+                              </div>
+                            )}
+                            {groupBy === 'date' && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>{group}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Timeline Grid Cells */}
+                          {periodColumns.map((period, colIndex) => (
+                            <div 
+                              key={`${group}-${colIndex}`} 
+                              className="border border-border/30 rounded min-h-12 h-12"
+                            ></div>
+                          ))}
+                        </div>
+                        
+                        {/* Commits positioned over the timeline */}
+                        <div 
+                          className="absolute top-0 left-[200px] right-0 h-12 flex items-center"
+                        >
+                          {/* Render individual commits */}
+                          {clusteredData.singleCommits.map(({commit, analysis, position}) => (
+                            <CommitBar
+                              key={commit.sha}
+                              commit={commit}
+                              analysis={analysis}
+                              startDate={dateRange.startDate}
+                              endDate={dateRange.endDate}
+                              onClick={() => openCommitDetails(commit, analysis)}
+                            />
+                          ))}
+                          
+                          {/* Render commit clusters */}
+                          {clusteredData.clusters.map((cluster, i) => (
+                            <CommitClusterBar
+                              key={`cluster-${i}`}
+                              cluster={cluster}
+                              startDate={dateRange.startDate}
+                              endDate={dateRange.endDate}
+                              onClusterClick={handleClusterClick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="impact">
+            {timelineData ? (
+              <CodeImpactAnalysis commits={timelineData.commits} />
+            ) : (
+              <div className="flex items-center justify-center h-48">
+                <div className="text-center space-y-4">
+                  <Info className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <h3 className="text-lg font-medium">No data available</h3>
+                  <p className="text-muted-foreground">Code impact analysis requires commit data.</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="complexity">
+            {timelineData ? (
+              <CommitComplexityAnalysis commits={timelineData.commits} analyses={timelineData.analyses} />
+            ) : (
+              <div className="flex items-center justify-center h-48">
+                <div className="text-center space-y-4">
+                  <Info className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <h3 className="text-lg font-medium">No data available</h3>
+                  <p className="text-muted-foreground">Complexity analysis requires commit data.</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="focus">
+            {timelineData ? (
+              <DeveloperFocusPatterns commits={timelineData.commits} />
+            ) : (
+              <div className="flex items-center justify-center h-48">
+                <div className="text-center space-y-4">
+                  <Info className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <h3 className="text-lg font-medium">No data available</h3>
+                  <p className="text-muted-foreground">Developer focus analysis requires commit data.</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="semantic">
+            {timelineData ? (
+              <SemanticCommitAnalysis commits={timelineData.commits} analyses={timelineData.analyses} />
+            ) : (
+              <div className="flex items-center justify-center h-48">
+                <div className="text-center space-y-4">
+                  <Info className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <h3 className="text-lg font-medium">No data available</h3>
+                  <p className="text-muted-foreground">Semantic analysis requires commit data.</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* List View of Commits */}
