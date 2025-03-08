@@ -62,6 +62,14 @@ interface CommitBarProps {
   onClick: () => void;
 }
 
+// First add a new interface for commit clustering
+interface CommitCluster {
+  commits: CommitRecord[];
+  analyses: CommitAnalysisRecord[];
+  position: number; // percentage position on timeline
+  count: number;
+}
+
 // Helper functions
 const formatDate = (dateString: string) => {
   try {
@@ -98,7 +106,7 @@ const formatPeriodLabel = (periodKey: string, periodType: TimelinePeriod): strin
   }
 };
 
-// Component for commit bars in Gantt chart
+// Implement a better CommitBar that handles single commits and clusters
 const CommitBar: React.FC<CommitBarProps> = ({ commit, analysis, startDate, endDate, onClick }) => {
   const commitDate = parseISO(commit.date);
   
@@ -114,7 +122,7 @@ const CommitBar: React.FC<CommitBarProps> = ({ commit, analysis, startDate, endD
       <Tooltip>
         <TooltipTrigger asChild>
           <div 
-            className="absolute h-8 bg-primary/30 rounded-md flex items-center justify-center px-2 cursor-pointer hover:bg-primary/50 transition-colors"
+            className="absolute h-8 bg-primary/30 rounded-md flex items-center justify-center px-2 cursor-pointer hover:bg-primary/50 transition-colors hover:z-20"
             style={{ 
               left: `${constrainedPosition}%`,
               width: '30px',
@@ -159,6 +167,119 @@ const CommitBar: React.FC<CommitBarProps> = ({ commit, analysis, startDate, endD
   );
 };
 
+// Create a new component to handle clusters of commits
+const CommitClusterBar: React.FC<{
+  cluster: CommitCluster;
+  startDate: Date;
+  endDate: Date;
+  onClusterClick: (cluster: CommitCluster) => void;
+}> = ({ cluster, startDate, endDate, onClusterClick }) => {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div 
+            className="absolute h-8 bg-primary/40 rounded-md flex items-center justify-center px-2 cursor-pointer hover:bg-primary/60 transition-colors border border-primary/30 hover:z-20"
+            style={{ 
+              left: `${cluster.position}%`,
+              width: '36px',
+              transform: 'translateX(-18px)',
+              zIndex: 15
+            }}
+            onClick={() => onClusterClick(cluster)}
+          >
+            <div className="font-medium text-xs">+{cluster.count}</div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-sm" sideOffset={5}>
+          <div className="space-y-2">
+            <div className="font-medium">Cluster of {cluster.count} commits</div>
+            <div className="text-xs flex items-center gap-1">
+              <Calendar className="h-3 w-3" /> From {formatDate(cluster.commits[0].date)} to {formatDate(cluster.commits[cluster.commits.length-1].date)}
+            </div>
+            <div className="text-xs">
+              <span className="font-semibold">Authors:</span> {Array.from(new Set(cluster.commits.map(c => c.author))).join(', ')}
+            </div>
+            <div className="text-xs flex items-center mt-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-6 text-xs w-full"
+                onClick={() => onClusterClick(cluster)}
+              >
+                View All Commits
+              </Button>
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+// Create a dialog to show clustered commits
+const ClusterDialog: React.FC<{
+  cluster: CommitCluster | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onCommitClick: (commit: CommitRecord, analysis?: CommitAnalysisRecord) => void;
+}> = ({ cluster, isOpen, onClose, onCommitClick }) => {
+  if (!cluster) return null;
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Commit Cluster ({cluster.count} commits)</DialogTitle>
+          <DialogDescription>
+            Commits close together in time between {formatDate(cluster.commits[0].date)} and {formatDate(cluster.commits[cluster.commits.length-1].date)}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 mt-4">
+          {cluster.commits.map((commit, index) => {
+            // Find the matching analysis
+            const analysis = cluster.analyses.find(a => a.commit_sha === commit.sha);
+            
+            return (
+              <div 
+                key={commit.sha}
+                className="p-4 rounded-lg border hover:bg-background/60 cursor-pointer transition-colors"
+                onClick={() => {
+                  onCommitClick(commit, analysis);
+                  onClose();
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
+                        {commit.author.substring(0, 2).toUpperCase()}
+                      </div>
+                    </Avatar>
+                    <span className="font-medium">{analysis?.title || commit.message}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{formatDate(commit.date)}</span>
+                </div>
+                
+                {analysis && (
+                  <Badge variant="outline" className="mt-2">
+                    {analysis.type}
+                  </Badge>
+                )}
+                
+                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                  {analysis?.description || commit.description || commit.message}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoading = false }) => {
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
@@ -172,6 +293,11 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
   const [selectedAnalysis, setSelectedAnalysis] = useState<CommitAnalysisRecord | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(isLoading);
+  
+  // New state for cluster handling
+  const [selectedCluster, setSelectedCluster] = useState<CommitCluster | null>(null);
+  const [isClusterDialogOpen, setIsClusterDialogOpen] = useState<boolean>(false);
+  const [clusterThreshold, setClusterThreshold] = useState<number>(2); // percentage threshold for clustering
 
   // Derive date range from commits
   const dateRange = useMemo(() => {
@@ -193,6 +319,91 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
       endDate: addDays(maxDate, 2)
     };
   }, [timelineData?.commits]);
+  
+  // Create clusters of commits that are close together
+  const createCommitClusters = (
+    commits: CommitRecord[], 
+    analyses: CommitAnalysisRecord[], 
+    threshold: number
+  ): { 
+    singleCommits: { commit: CommitRecord, analysis?: CommitAnalysisRecord, position: number }[],
+    clusters: CommitCluster[] 
+  } => {
+    if (!commits.length) return { singleCommits: [], clusters: [] };
+    
+    // Sort commits by date
+    const sortedCommits = [...commits].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Calculate position for each commit
+    const positionedCommits = sortedCommits.map(commit => {
+      const commitDate = new Date(commit.date).getTime();
+      const timeRange = dateRange.endDate.getTime() - dateRange.startDate.getTime();
+      const position = timeRange <= 0 ? 50 : ((commitDate - dateRange.startDate.getTime()) / timeRange) * 100;
+      
+      // Find matching analysis
+      const analysis = analyses.find(a => a.commit_sha === commit.sha);
+      
+      return {
+        commit,
+        analysis,
+        position: Math.max(0, Math.min(position, 100)) // Constrain between 0-100%
+      };
+    });
+    
+    // Group commits that are within the threshold of each other
+    const clusters: CommitCluster[] = [];
+    const singleCommits: typeof positionedCommits = [];
+    
+    // Use a sliding window approach to identify clusters
+    let currentCluster: typeof positionedCommits = [];
+    
+    for (let i = 0; i < positionedCommits.length; i++) {
+      const current = positionedCommits[i];
+      
+      if (currentCluster.length === 0) {
+        currentCluster.push(current);
+        continue;
+      }
+      
+      const prev = currentCluster[currentCluster.length - 1];
+      if (Math.abs(current.position - prev.position) <= threshold) {
+        // Close enough to be in the same cluster
+        currentCluster.push(current);
+      } else {
+        // Too far, close current cluster and start a new one
+        if (currentCluster.length > 1) {
+          // Only create clusters for 2+ commits
+          clusters.push({
+            commits: currentCluster.map(c => c.commit),
+            analyses: currentCluster.map(c => c.analysis).filter(Boolean) as CommitAnalysisRecord[],
+            position: currentCluster.reduce((sum, c) => sum + c.position, 0) / currentCluster.length,
+            count: currentCluster.length
+          });
+        } else {
+          // Single commits get their own representation
+          singleCommits.push(...currentCluster);
+        }
+        
+        currentCluster = [current];
+      }
+    }
+    
+    // Handle the last cluster
+    if (currentCluster.length > 1) {
+      clusters.push({
+        commits: currentCluster.map(c => c.commit),
+        analyses: currentCluster.map(c => c.analysis).filter(Boolean) as CommitAnalysisRecord[],
+        position: currentCluster.reduce((sum, c) => sum + c.position, 0) / currentCluster.length,
+        count: currentCluster.length
+      });
+    } else {
+      singleCommits.push(...currentCluster);
+    }
+    
+    return { singleCommits, clusters };
+  };
 
   // Fetch data on mount and when filters change
   useEffect(() => {
@@ -252,6 +463,11 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
     setSelectedAnalysis(analysis || null);
     setIsDialogOpen(true);
   };
+  
+  const handleClusterClick = (cluster: CommitCluster) => {
+    setSelectedCluster(cluster);
+    setIsClusterDialogOpen(true);
+  };
 
   const handlePeriodChange = (value: string) => {
     setPeriodType(value as TimelinePeriod);
@@ -259,6 +475,13 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
 
   const handleGroupByChange = (value: string) => {
     setGroupBy(value as TimelineGroupBy);
+  };
+  
+  const handleClusterThresholdChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0.5 && numValue <= 10) {
+      setClusterThreshold(numValue);
+    }
   };
 
   // Generate period columns based on periodType
@@ -475,6 +698,24 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
               </SelectContent>
             </Select>
           </div>
+
+          <div className="flex flex-col gap-1 w-24">
+            <span className="text-xs text-muted-foreground">Clustering</span>
+            <Select 
+              value={clusterThreshold.toString()} 
+              onValueChange={handleClusterThresholdChange}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Threshold" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0.5">Tight</SelectItem>
+                <SelectItem value="2">Normal</SelectItem>
+                <SelectItem value="5">Loose</SelectItem>
+                <SelectItem value="10">Very Loose</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           
           <Button 
             variant="outline" 
@@ -508,77 +749,97 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
           
           {/* Gantt Rows */}
           <div className="mt-4 space-y-4">
-            {groupKeys.map((group, rowIndex) => (
-              <div 
-                key={group} 
-                className="relative"
-              >
-                {/* Row Label */}
+            {groupKeys.map((group, rowIndex) => {
+              // Get all analyses for this group and their associated commits
+              const groupAnalyses = groups[group];
+              const groupCommits = groupAnalyses
+                .map(analysis => {
+                  const commit = timelineData.commits.find(c => c.sha === analysis.commit_sha);
+                  return commit ? { commit, analysis } : null;
+                })
+                .filter(Boolean)
+                .map(item => item as { commit: CommitRecord, analysis: CommitAnalysisRecord });
+              
+              // Process clustering for this row
+              const clusteredData = createCommitClusters(
+                groupCommits.map(item => item.commit),
+                groupCommits.map(item => item.analysis),
+                clusterThreshold
+              );
+              
+              return (
                 <div 
-                  className="grid gap-2 items-center" 
-                  style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}
+                  key={group} 
+                  className="relative"
                 >
-                  <div className="font-medium text-sm truncate">
-                    {groupBy === 'type' && (
-                      <Badge variant="outline" className={`bg-primary/10 text-primary border-primary/20`}>
-                        {group}
-                      </Badge>
-                    )}
-                    {groupBy === 'author' && (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
-                            {group.substring(0, 2).toUpperCase()}
-                          </div>
-                        </Avatar>
-                        <span>{group}</span>
-                      </div>
-                    )}
-                    {groupBy === 'date' && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{group}</span>
-                      </div>
-                    )}
+                  {/* Row Label */}
+                  <div 
+                    className="grid gap-2 items-center" 
+                    style={{ gridTemplateColumns: `200px repeat(${periodColumns.length}, 1fr)` }}
+                  >
+                    <div className="font-medium text-sm truncate">
+                      {groupBy === 'type' && (
+                        <Badge variant="outline" className={`bg-primary/10 text-primary border-primary/20`}>
+                          {group}
+                        </Badge>
+                      )}
+                      {groupBy === 'author' && (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <div className="bg-primary text-primary-foreground w-full h-full flex items-center justify-center text-xs font-bold">
+                              {group.substring(0, 2).toUpperCase()}
+                            </div>
+                          </Avatar>
+                          <span>{group}</span>
+                        </div>
+                      )}
+                      {groupBy === 'date' && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{group}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Timeline Grid Cells */}
+                    {periodColumns.map((period, colIndex) => (
+                      <div 
+                        key={`${group}-${colIndex}`} 
+                        className="border border-border/30 rounded min-h-12 h-12"
+                      ></div>
+                    ))}
                   </div>
                   
-                  {/* Timeline Grid Cells */}
-                  {periodColumns.map((period, colIndex) => (
-                    <div 
-                      key={`${group}-${colIndex}`} 
-                      className="border border-border/30 rounded min-h-12 h-12"
-                    ></div>
-                  ))}
-                </div>
-                
-                {/* Commits positioned over the timeline */}
-                <div 
-                  className="absolute top-0 left-[200px] right-0 h-12 flex items-center"
-                >
-                  {/* Find commits for this group */}
-                  {groups[group].map(analysis => {
-                    // Find the commit for this analysis
-                    const commit = timelineData.commits.find(c => c.sha === analysis.commit_sha);
-                    if (!commit) return null;
-                    
-                    // Only show if it fits within our date range
-                    const commitDate = parseISO(commit.date);
-                    if (commitDate < dateRange.startDate || commitDate > dateRange.endDate) return null;
-                    
-                    return (
+                  {/* Commits positioned over the timeline */}
+                  <div 
+                    className="absolute top-0 left-[200px] right-0 h-12 flex items-center"
+                  >
+                    {/* Render individual commits */}
+                    {clusteredData.singleCommits.map(({commit, analysis, position}) => (
                       <CommitBar
-                        key={analysis.id}
+                        key={commit.sha}
                         commit={commit}
                         analysis={analysis}
                         startDate={dateRange.startDate}
                         endDate={dateRange.endDate}
                         onClick={() => openCommitDetails(commit, analysis)}
                       />
-                    );
-                  })}
+                    ))}
+                    
+                    {/* Render commit clusters */}
+                    {clusteredData.clusters.map((cluster, i) => (
+                      <CommitClusterBar
+                        key={`cluster-${i}`}
+                        cluster={cluster}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                        onClusterClick={handleClusterClick}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -748,6 +1009,14 @@ const ChronoTimeline: React.FC<ChronoTimelineProps> = ({ repositoryName, isLoadi
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Cluster Dialog */}
+      <ClusterDialog
+        cluster={selectedCluster}
+        isOpen={isClusterDialogOpen}
+        onClose={() => setIsClusterDialogOpen(false)}
+        onCommitClick={openCommitDetails}
+      />
     </div>
   );
 };
