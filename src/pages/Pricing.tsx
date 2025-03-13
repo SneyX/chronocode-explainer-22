@@ -1,8 +1,9 @@
+
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, GitBranch } from "lucide-react";
+import { Check } from "lucide-react";
 
 const PricingCard = ({ 
   title, 
@@ -71,22 +72,24 @@ const Pricing = () => {
                 price="$0"
                 description="For individuals and small projects"
                 features={[
-                  "5 repositories per month",
-                  "5 million tokens per month",
-                  "Basic analytics"
+                  "3 repositories",
+                  "30 commits per repository",
+                  "Basic analytics",
+                  "Community support"
                 ]}
                 ctaText="Get Started"
               />
               
               <PricingCard
-                title="Pay Per Use"
-                price="Starting at $10"
+                title="Pro"
+                price="$29"
                 description="Perfect for growing teams"
                 features={[
-                  "Up to 20 repositories per month",
-                  "Up to 20 million tokens per month",
+                  "30 repositories",
+                  "100 commits per repository",
                   "Advanced analytics",
-                  "Priority support"
+                  "Priority support",
+                  "Export capabilities"
                 ]}
                 popular={true}
                 ctaText="Choose Plan"
@@ -98,7 +101,7 @@ const Pricing = () => {
                 description="For large organizations"
                 features={[
                   "Unlimited repositories",
-                  "Unlimited tokens",
+                  "Unlimited commits",
                   "Custom integrations",
                   "Dedicated support",
                   "SLA guarantees"
@@ -115,23 +118,23 @@ const Pricing = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
               <div>
-                <h3 className="text-lg font-medium mb-2">What is a token?</h3>
-                <p className="text-muted-foreground">Tokens are the units of measurement for processing code. A typical line of code is around 10-20 tokens.</p>
+                <h3 className="text-lg font-medium mb-2">What happens when I reach my repository limit?</h3>
+                <p className="text-muted-foreground">You'll need to upgrade your plan to add more repositories or remove existing ones to stay within your plan limits.</p>
               </div>
               
               <div>
-                <h3 className="text-lg font-medium mb-2">How does the Pay Per Use plan work?</h3>
-                <p className="text-muted-foreground">You only pay for what you use, up to the specified limits. Once you reach the limits, you can upgrade or pay for additional usage.</p>
+                <h3 className="text-lg font-medium mb-2">Can I upgrade or downgrade at any time?</h3>
+                <p className="text-muted-foreground">Yes, you can change your plan at any time. When upgrading, you'll get immediate access to the new features.</p>
               </div>
               
               <div>
-                <h3 className="text-lg font-medium mb-2">Can I change plans anytime?</h3>
-                <p className="text-muted-foreground">Yes, you can upgrade, downgrade, or cancel your subscription at any time.</p>
+                <h3 className="text-lg font-medium mb-2">What counts as a commit analysis?</h3>
+                <p className="text-muted-foreground">Each individual commit that we process counts toward your plan limit. Large repositories with many commits may reach limits faster.</p>
               </div>
               
               <div>
-                <h3 className="text-lg font-medium mb-2">Is there a limit to the repository size?</h3>
-                <p className="text-muted-foreground">There's no hard limit on repository size, but larger repositories will consume more tokens.</p>
+                <h3 className="text-lg font-medium mb-2">Do you offer discounts for open source projects?</h3>
+                <p className="text-muted-foreground">Yes! We offer special pricing for verified open source projects. Contact us for more information.</p>
               </div>
             </div>
           </div>
