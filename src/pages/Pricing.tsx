@@ -1,9 +1,28 @@
 
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/components/AuthProvider";
+import { stripeService } from "@/services/stripeService";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
+
+// Stripe price IDs for each plan
+const STRIPE_PRICE_IDS = {
+  free: '', // Free plan has no price ID
+  pro: 'price_1OqrBrCZ6qsJgndgSOBrxwak', // Replace with your actual Stripe price ID
+  enterprise: '' // Enterprise is custom, handled separately
+};
 
 const PricingCard = ({ 
   title, 
@@ -11,15 +30,30 @@ const PricingCard = ({
   description, 
   features, 
   ctaText, 
-  popular = false 
+  popular = false,
+  priceId,
+  onSubscribe
 }: { 
   title: string; 
   price: string; 
   description: string; 
   features: string[]; 
   ctaText: string; 
-  popular?: boolean; 
+  popular?: boolean;
+  priceId?: string;
+  onSubscribe: (priceId?: string) => void;
 }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      await onSubscribe(priceId);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card className={`w-full max-w-md ${popular ? 'border-primary shadow-lg' : ''} h-full flex flex-col`}>
       <CardHeader>
@@ -45,8 +79,20 @@ const PricingCard = ({
         </ul>
       </CardContent>
       <CardFooter>
-        <Button className="w-full" variant={popular ? "default" : "outline"}>
-          {ctaText}
+        <Button 
+          className="w-full" 
+          variant={popular ? "default" : "outline"}
+          onClick={handleClick}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            ctaText
+          )}
         </Button>
       </CardFooter>
     </Card>
@@ -54,6 +100,44 @@ const PricingCard = ({
 };
 
 const Pricing = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+
+  const handleSubscribe = async (priceId?: string) => {
+    if (!user) {
+      setShowLoginDialog(true);
+      return;
+    }
+
+    if (!priceId) {
+      // Handle free plan or enterprise plan (contact sales)
+      if (priceId === STRIPE_PRICE_IDS.free) {
+        toast.success("You're signed up for the Free plan!");
+        return;
+      } else {
+        // Enterprise plan
+        toast.success("Our sales team will contact you soon!");
+        return;
+      }
+    }
+
+    try {
+      // Create a Stripe checkout session
+      const { url } = await stripeService.createCheckoutSession({
+        priceId,
+        successUrl: `${window.location.origin}/payment-success`,
+        cancelUrl: `${window.location.origin}/pricing`,
+      });
+
+      // Redirect to Stripe checkout
+      window.location.href = url;
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      toast.error("Failed to create checkout session. Please try again.");
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -78,6 +162,8 @@ const Pricing = () => {
                   "Community support"
                 ]}
                 ctaText="Get Started"
+                priceId={STRIPE_PRICE_IDS.free}
+                onSubscribe={handleSubscribe}
               />
               
               <PricingCard
@@ -92,6 +178,8 @@ const Pricing = () => {
                   "Export capabilities"
                 ]}
                 popular={true}
+                priceId={STRIPE_PRICE_IDS.pro}
+                onSubscribe={handleSubscribe}
                 ctaText="Choose Plan"
               />
               
@@ -106,6 +194,8 @@ const Pricing = () => {
                   "Dedicated support",
                   "SLA guarantees"
                 ]}
+                priceId={STRIPE_PRICE_IDS.enterprise}
+                onSubscribe={handleSubscribe}
                 ctaText="Contact Sales"
               />
             </div>
@@ -140,6 +230,28 @@ const Pricing = () => {
           </div>
         </section>
       </main>
+
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign in required</DialogTitle>
+            <DialogDescription>
+              You need to be signed in to subscribe to a plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setShowLoginDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              setShowLoginDialog(false);
+              navigate('/auth');
+            }}>
+              Sign in
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       <Footer />
     </div>
