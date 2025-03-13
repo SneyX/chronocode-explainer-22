@@ -45,17 +45,25 @@ const Auth = () => {
     setError(null);
     
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: window.location.origin,
+          data: {
+            email_confirmed: true
+          }
         },
       });
       
       if (error) throw error;
       
-      toast.success("Check your email for the confirmation link!");
+      if (data.session) {
+        toast.success("Account created successfully!");
+        navigate("/");
+      } else {
+        toast.success("Account created! You can now sign in.");
+      }
     } catch (error: any) {
       setError(error.message);
       toast.error("Failed to sign up");
