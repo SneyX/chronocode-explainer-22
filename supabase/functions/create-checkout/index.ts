@@ -37,12 +37,30 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Find the default price for the product
+    let priceToUse = priceId;
+    
+    // If it's a product ID, get the default price
+    if (priceId.startsWith('prod_')) {
+      const prices = await stripe.prices.list({
+        product: priceId,
+        active: true,
+        limit: 1,
+      });
+      
+      if (prices.data.length === 0) {
+        throw new Error('No active prices found for this product');
+      }
+      
+      priceToUse = prices.data[0].id;
+    }
+
     // Create a Stripe checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price: priceToUse,
           quantity: 1,
         },
       ],

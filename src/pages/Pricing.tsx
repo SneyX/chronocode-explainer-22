@@ -20,8 +20,8 @@ import { useNavigate } from "react-router-dom";
 // Stripe price IDs for each plan
 const STRIPE_PRICE_IDS = {
   free: '', // Free plan has no price ID
-  pro: 'price_1OqrBrCZ6qsJgndgSOBrxwak', // Replace with your actual Stripe price ID
-  enterprise: '' // Enterprise is custom, handled separately
+  pro: 'prod_RwCo8wbd1ZUlXa', // Updated with the actual product ID
+  proPlus: 'prod_RwCpl9iB2gIz2E' // Added Pro Plus product ID
 };
 
 const PricingCard = ({ 
@@ -68,6 +68,7 @@ const PricingCard = ({
       <CardContent className="flex-grow">
         <div className="mb-6">
           <span className="text-3xl font-bold">{price}</span>
+          {price !== "$0" && <span className="text-muted-foreground">/month</span>}
         </div>
         <ul className="space-y-3">
           {features.map((feature, i) => (
@@ -111,15 +112,9 @@ const Pricing = () => {
     }
 
     if (!priceId) {
-      // Handle free plan or enterprise plan (contact sales)
-      if (priceId === STRIPE_PRICE_IDS.free) {
-        toast.success("You're signed up for the Free plan!");
-        return;
-      } else {
-        // Enterprise plan
-        toast.success("Our sales team will contact you soon!");
-        return;
-      }
+      // Handle free plan (no payment required)
+      toast.success("You're signed up for the Free plan!");
+      return;
     }
 
     try {
@@ -184,9 +179,9 @@ const Pricing = () => {
               />
               
               <PricingCard
-                title="Enterprise"
-                price="Custom"
-                description="For large organizations"
+                title="Pro Plus"
+                price="$50"
+                description="For demanding professionals"
                 features={[
                   "Unlimited repositories",
                   "Unlimited commits",
@@ -194,9 +189,9 @@ const Pricing = () => {
                   "Dedicated support",
                   "SLA guarantees"
                 ]}
-                priceId={STRIPE_PRICE_IDS.enterprise}
+                priceId={STRIPE_PRICE_IDS.proPlus}
                 onSubscribe={handleSubscribe}
-                ctaText="Contact Sales"
+                ctaText="Choose Plan"
               />
             </div>
           </div>
